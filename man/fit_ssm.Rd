@@ -7,7 +7,8 @@
 fit_ssm(d, vmax = 50, ang = -1, distlim = c(2500, 5000),
   spdf = TRUE, min.dt = 60, pf = FALSE, model = "rw",
   time.step = 6, parameters = NULL, fit.to.subset = TRUE,
-  optim = "nlminb", verbose = 1, inner.control = NULL)
+  optim = "nlminb", verbose = 1, inner.control = NULL,
+  nbStates = 1)
 }
 \arguments{
 \item{d}{a data frame of observations including Argos KF error ellipse info}
@@ -48,6 +49,8 @@ this if you know what you are doing...}
 
 \item{inner.control}{list of control settings for the inner optimization
 (see ?TMB::MakeADFUN for additional details)}
+
+\item{nbStates}{Number of states. Default: \code{nbStates=1}.}
 }
 \value{
 a list with components

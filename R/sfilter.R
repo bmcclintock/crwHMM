@@ -23,6 +23,7 @@
 ##' @param verbose report progress during minimization
 ##' @param inner.control list of control settings for the inner optimization
 ##' (see ?TMB::MakeADFUN for additional details)
+##' @param nbStates Number of states. Default: \code{nbStates=1}.
 ##'
 ##' @useDynLib crwHMM
 ##' @importFrom TMB MakeADFun sdreport newtonOption
@@ -47,7 +48,8 @@ sfilter <-
            fit.to.subset = TRUE,
            optim = c("nlminb", "optim"),
            verbose = FALSE,
-           inner.control = NULL) {
+           inner.control = NULL,
+           nbStates = 1) {
 
     st <- proc.time()
     call <- match.call()
@@ -136,10 +138,10 @@ sfilter <-
       rho <- V[1, 2] / prod(sigma)
 
       parameters <- list(
-        l_sigma = log(pmax(1e-08, sigma)),
-        l_rho_p = log((1 + rho) / (1 - rho)),
+        l_sigma = matrix(log(pmax(1e-08, sigma)),nbStates,2,byrow = TRUE),
+        l_rho_p = rep(log((1 + rho) / (1 - rho)),nbStates),
         X = xs,
-        logD = 10,
+        logD = rep(10,nbStates),
         mu = t(xs),
         v = t(xs) * 0,
         l_psi = 0,
@@ -154,20 +156,20 @@ sfilter <-
     map <- switch(model,
                   rw = {
                     if (pls == 1) {
-                      list(logD = factor(NA),
+                      list(logD = factor(rep(NA,nbStates)),
                            l_psi = factor(NA),
                            mu = factor(rbind(rep(NA, nrow(xs)), rep(NA, nrow(xs)))),
                            v =  factor(rbind(rep(NA, nrow(xs)), rep(NA, nrow(xs))))
                            )
                     } else if (pls == 0) {
-                      list(logD = factor(NA),
+                      list(logD = factor(rep(NA,nbStates)),
                            l_tau = factor(c(NA, NA)),
                            l_rho_o = factor(NA),
                            mu = factor(rbind(rep(NA, nrow(xs)), rep(NA, nrow(xs)))),
                            v =  factor(rbind(rep(NA, nrow(xs)), rep(NA, nrow(xs))))
                            )
                     } else if (pls > 0 & pls < 1) {
-                      list(logD = factor(NA),
+                      list(logD = factor(rep(NA,nbStates)),
                            mu = factor(rbind(rep(NA, nrow(xs)), rep(NA, nrow(xs)))),
                            v =  factor(rbind(rep(NA, nrow(xs)), rep(NA, nrow(xs))))
                            )
@@ -176,22 +178,22 @@ sfilter <-
                   crw = {
                     if (pls == 1) {
                       list(
-                        l_sigma = factor(c(NA, NA)),
-                        l_rho_p = factor(NA),
+                        l_sigma = factor(matrix(NA,nbStates,2)),
+                        l_rho_p = factor(rep(NA,nbStates)),
                         X = factor(cbind(rep(NA, nrow(xs)), rep(NA, nrow(xs)))),
                         l_psi = factor(NA)
                       )
                     } else if (pls == 0) {
                       list(
-                        l_sigma = factor(c(NA, NA)),
-                        l_rho_p = factor(NA),
+                        l_sigma = factor(matrix(NA,nbStates,2)),
+                        l_rho_p = factor(rep(NA,nbStates)),
                         X = factor(cbind(rep(NA, nrow(xs)), rep(NA, nrow(xs)))),
                         l_tau = factor(c(NA, NA)),
                         l_rho_o = factor(NA)
                       )
                     } else if (pls > 0 & pls < 1) {
-                      list(l_sigma = factor(c(NA, NA)),
-                           l_rho_p = factor(NA),
+                      list(l_sigma = factor(matrix(NA,nbStates,2)),
+                           l_rho_p = factor(rep(NA,nbStates)),
                            X = factor(cbind(rep(NA, nrow(xs)), rep(NA, nrow(xs))))
                       )
                     }
@@ -212,7 +214,8 @@ sfilter <-
       m = d.all$smin,
       M = d.all$smaj,
       c = d.all$eor,
-      K = cbind(d.all$amf_x, d.all$amf_y)
+      K = cbind(d.all$amf_x, d.all$amf_y),
+      nbStates = nbStates
     )
 
     ## TMB - create objective function

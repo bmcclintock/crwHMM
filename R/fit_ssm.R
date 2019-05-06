@@ -29,6 +29,7 @@
 ##' @param verbose report progress during minimization; 0 for complete silence; 1 for progress bar only; 2 for minimizer trace but not progress bar
 ##' @param inner.control list of control settings for the inner optimization
 ##' (see ?TMB::MakeADFUN for additional details)
+##' @param nbStates Number of states. Default: \code{nbStates=1}.
 ##'
 ##' @return a list with components
 ##' \item{\code{call}}{the matched call}
@@ -78,7 +79,8 @@ fit_ssm <- function(d,
                     fit.to.subset = TRUE,
                     optim = "nlminb",
                     verbose = 1,
-                    inner.control = NULL
+                    inner.control = NULL,
+                    nbStates = 1
                     )
 {
 
@@ -123,7 +125,8 @@ fit_ssm <- function(d,
         fit.to.subset = fit.to.subset,
         optim = optim,
         verbose = verb,
-        inner.control = inner.control
+        inner.control = inner.control,
+        nbStates = nbStates
       ),
       silent = TRUE)
       )

@@ -6,7 +6,7 @@
 \usage{
 sfilter(x, model = c("rw", "crw"), time.step = 6, parameters = NULL,
   fit.to.subset = TRUE, optim = c("nlminb", "optim"),
-  verbose = FALSE, inner.control = NULL)
+  verbose = FALSE, inner.control = NULL, nbStates = 1)
 }
 \arguments{
 \item{x}{Argos data passed through prefilter()}
@@ -30,6 +30,8 @@ this if you know what you are doing...}
 
 \item{inner.control}{list of control settings for the inner optimization
 (see ?TMB::MakeADFUN for additional details)}
+
+\item{nbStates}{Number of states. Default: \code{nbStates=1}.}
 }
 \description{
 generates initial values for model parameters and unobserved states;

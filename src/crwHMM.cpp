@@ -24,6 +24,7 @@ template<class Type>
     DATA_IVECTOR(isd);          //  indexes observations vs. interpolation points
     DATA_IVECTOR(obs_mod);      //  indicates which obs error model to be used
     DATA_INTEGER(proc_mod);		//	indicates which process model to be used: RW or CRW
+    DATA_INTEGER(nbStates);  // number of states
 
     // for KF observation model
     DATA_VECTOR(m);             //  m is the semi-minor axis length
@@ -34,11 +35,11 @@ template<class Type>
 
     // PROCESS PARAMETERS
     // for RW
-    PARAMETER_VECTOR(l_sigma);    //  Innovation variance (link scale)
-    PARAMETER(l_rho_p);           //  Innovation correlation (link scale)
+    PARAMETER_MATRIX(l_sigma);    //  Innovation variance (link scale)
+    PARAMETER_VECTOR(l_rho_p);           //  Innovation correlation (link scale)
     PARAMETER_MATRIX(X);          //  Predicted locations TP - length(X) should be same as length(dt) - i.e. both interp & obs pos.
     // for CRW
-    PARAMETER(logD);				// 1-d Diffusion coefficient
+    PARAMETER_VECTOR(logD);				// 1-d Diffusion coefficient
     // random variables
     PARAMETER_MATRIX(mu); /* State location */
     PARAMETER_MATRIX(v); /* state velocities */
@@ -51,12 +52,16 @@ template<class Type>
     PARAMETER(l_rho_o);             // error correlation
 
 	  // Transform parameters
-	  vector<Type> sigma = exp(l_sigma);
-    Type rho_p = Type(2.0) / (Type(1.0) + exp(-l_rho_p)) - Type(1.0);
+	  matrix<Type> sigma(nbStates,2);
+	  for(int state = 0; state < nbStates; state++){
+	    sigma(state,0) =  exp(l_sigma(state,0));
+	    sigma(state,1) =  exp(l_sigma(state,1));
+	  }
+    vector<Type> rho_p = Type(2.0) / (Type(1.0) + exp(-l_rho_p)) - Type(1.0);
     vector<Type> tau = exp(l_tau);
     Type rho_o = Type(2.0) / (Type(1.0) + exp(-l_rho_o)) - Type(1.0);
     Type psi = exp(l_psi);
-    Type D = exp(logD);
+    vector<Type> D = exp(logD);
 
     int timeSteps = dt.size();
 
@@ -70,53 +75,60 @@ template<class Type>
     	matrix<Type> cov(2, 2);
     	matrix<Type> cov_dt(2, 2);            // tmp matrix for dt * cov calcs withn process loop
 
-    	cov(0, 0) = sigma(0) * sigma(0);
-    	cov(0, 1) = rho_p * sigma(0) * sigma(1);
-    	cov(1, 0) = cov(0, 1);
-    	cov(1, 1) = sigma(1) * sigma(1);
-
-		MVNORM_t<Type> nll_proc(cov);
+		  MVNORM_t<Type> nll_proc(cov);
 
     	// RW PROCESS MODEL
-    	for(int i = 1; i < timeSteps; i++) {
-      		cov_dt = dt(i) * dt(i) * cov;
-      		nll_proc.setSigma(cov_dt);
-      		jnll += nll_proc(X.row(i) - X.row(i - 1));
+    	for(int state = 0; state < nbStates; state++){
+    	  
+    	  cov(0, 0) = sigma(state,0) * sigma(state,0);
+      	cov(0, 1) = rho_p(state) * sigma(state,0) * sigma(state,1);
+      	cov(1, 0) = cov(0, 1);
+      	cov(1, 1) = sigma(state,1) * sigma(state,1);
+    	
+      	for(int i = 1; i < timeSteps; i++) {
+        		cov_dt = dt(i) * dt(i) * cov;
+        		nll_proc.setSigma(cov_dt);
+        		jnll += nll_proc(X.row(i) - X.row(i - 1));
+      	}
     	}
     } else if(proc_mod == 1){
     	// CRW
 		// Setup object for evaluating multivariate normal likelihood
     	matrix<Type> cov(4,4);
-    	cov.setZero();
-    	cov(0,0) = tiny;
-    	cov(1,1) = tiny;
-    	cov(2,2) = 2 * D * dt(0);
-    	cov(3,3) = 2 * D * dt(0);
-
-    	// loop over 2 coords and update nll of start location and velocities.
-    	for(int i = 0; i < 2; i++) {
-    	  jnll -= dnorm(mu(i,0), state0(i), tiny, true);
-    	  jnll -= dnorm(v(i,0), state0(i+2), tiny, true);
-    	}
 
     	// CRW PROCESS MODEL
     	vector<Type> x_t(4);
-    	for(int i = 1; i < timeSteps; i++) {
-    		// process cov at time t
-      		cov.setZero();
-      		cov(0,0) = tiny;
-      		cov(1,1) = tiny;
-      		cov(2,2) = 2 * D * dt(i);
-      		cov(3,3) = 2 * D * dt(i);
-
-      		// location innovations
-      		x_t(0) = mu(0,i) - (mu(0,i-1) + (v(0,i) * dt(i)));
-      		x_t(1) = mu(1,i) - (mu(1,i-1) + (v(1,i) * dt(i)));
-
-      		// velocity innovations
-      		x_t(2) = (v(0,i) - v(0,i-1)); // /dt(i);
-      		x_t(3) = (v(1,i) - v(1,i-1)); // /dt(i);
-      		jnll += MVNORM<Type>(cov)(x_t); // Process likelihood
+    	for(int state=0; state < nbStates; state++){
+    	  
+  	    cov.setZero();
+  	    cov(0,0) = tiny;
+  	    cov(1,1) = tiny;
+  	    cov(2,2) = 2 * D(state) * dt(0);
+      	cov(3,3) = 2 * D(state) * dt(0);
+  
+      	// loop over 2 coords and update nll of start location and velocities.
+      	for(int i = 0; i < 2; i++) {
+      	  jnll -= dnorm(mu(i,0), state0(i), tiny, true);
+      	  jnll -= dnorm(v(i,0), state0(i+2), tiny, true);
+      	}
+      	
+      	for(int i = 1; i < timeSteps; i++) {
+      		// process cov at time t
+        		cov.setZero();
+        		cov(0,0) = tiny;
+        		cov(1,1) = tiny;
+        		cov(2,2) = 2 * D(state) * dt(i);
+        		cov(3,3) = 2 * D(state) * dt(i);
+  
+        		// location innovations
+        		x_t(0) = mu(0,i) - (mu(0,i-1) + (v(0,i) * dt(i)));
+        		x_t(1) = mu(1,i) - (mu(1,i-1) + (v(1,i) * dt(i)));
+  
+        		// velocity innovations
+        		x_t(2) = (v(0,i) - v(0,i-1)); // /dt(i);
+        		x_t(3) = (v(1,i) - v(1,i-1)); // /dt(i);
+        		jnll += MVNORM<Type>(cov)(x_t); // Process likelihood
+      	}
     	}
     }
 
