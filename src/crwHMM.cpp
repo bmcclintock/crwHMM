@@ -25,6 +25,8 @@ template<class Type>
     DATA_IVECTOR(obs_mod);      //  indicates which obs error model to be used
     DATA_INTEGER(proc_mod);		//	indicates which process model to be used: RW or CRW
     DATA_INTEGER(nbStates);  // number of states
+    DATA_INTEGER(nbSteps);  // number of predicted intervals 
+    DATA_IVECTOR(nbObs);  // number of observations and predicted locations per time step
 
     // for KF observation model
     DATA_VECTOR(m);             //  m is the semi-minor axis length
@@ -79,16 +81,20 @@ template<class Type>
 
     	// RW PROCESS MODEL
     	for(int state = 0; state < nbStates; state++){
-    	  
+      	  
     	  cov(0, 0) = sigma(state,0) * sigma(state,0);
       	cov(0, 1) = rho_p(state) * sigma(state,0) * sigma(state,1);
       	cov(1, 0) = cov(0, 1);
       	cov(1, 1) = sigma(state,1) * sigma(state,1);
-    	
-      	for(int i = 1; i < timeSteps; i++) {
-        		cov_dt = dt(i) * dt(i) * cov;
+      	
+      	int count = 1;
+    	  for(int t=0; t < nbSteps; t++){
+        	for(int i = 0; i < nbObs[t]; i++) {
+        		cov_dt = dt(count) * dt(count) * cov;
         		nll_proc.setSigma(cov_dt);
-        		jnll += nll_proc(X.row(i) - X.row(i - 1));
+        		jnll += nll_proc(X.row(count) - X.row(count - 1));
+        		count += 1;
+        	}
       	}
     	}
     } else if(proc_mod == 1){
@@ -112,22 +118,26 @@ template<class Type>
       	  jnll -= dnorm(v(i,0), state0(i+2), tiny, true);
       	}
       	
-      	for(int i = 1; i < timeSteps; i++) {
-      		// process cov at time t
+      	int count = 1;
+    	  for(int t=0; t < nbSteps; t++){
+        	for(int i = 0; i < nbObs[t]; i++) {
+        		// process cov at time t
         		cov.setZero();
         		cov(0,0) = tiny;
         		cov(1,1) = tiny;
-        		cov(2,2) = 2 * D(state) * dt(i);
-        		cov(3,3) = 2 * D(state) * dt(i);
+        		cov(2,2) = 2 * D(state) * dt(count);
+        		cov(3,3) = 2 * D(state) * dt(count);
   
         		// location innovations
-        		x_t(0) = mu(0,i) - (mu(0,i-1) + (v(0,i) * dt(i)));
-        		x_t(1) = mu(1,i) - (mu(1,i-1) + (v(1,i) * dt(i)));
+        		x_t(0) = mu(0,count) - (mu(0,count-1) + (v(0,count) * dt(count)));
+        		x_t(1) = mu(1,count) - (mu(1,count-1) + (v(1,count) * dt(count)));
   
         		// velocity innovations
-        		x_t(2) = (v(0,i) - v(0,i-1)); // /dt(i);
-        		x_t(3) = (v(1,i) - v(1,i-1)); // /dt(i);
+        		x_t(2) = (v(0,count) - v(0,count-1)); // /dt(count);
+        		x_t(3) = (v(1,count) - v(1,count-1)); // /dt(count);
         		jnll += MVNORM<Type>(cov)(x_t); // Process likelihood
+        		count += 1;
+        	}
       	}
     	}
     }

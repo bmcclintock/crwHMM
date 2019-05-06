@@ -93,6 +93,13 @@ sfilter <-
         filter(id == unique(d$id)) %>%
         select(date)
     }
+    
+    # get number of observations per time interval
+    nbSteps <- length(ts$date)-1
+    nbObs <- numeric(nbSteps)
+    obsInt <- findInterval(d$date,ts$date)
+    nbObs[unique(obsInt)] <- table(obsInt)
+    nbObs <- nbObs + 1 # add end predicted location for each time step
 
     ## merge data and interpolation times
     d.all <- full_join(d, ts, by = "date") %>%
@@ -215,7 +222,9 @@ sfilter <-
       M = d.all$smaj,
       c = d.all$eor,
       K = cbind(d.all$amf_x, d.all$amf_y),
-      nbStates = nbStates
+      nbStates = nbStates,
+      nbSteps = nbSteps,
+      nbObs = nbObs
     )
 
     ## TMB - create objective function
