@@ -135,26 +135,35 @@ sfilter <-
     xs <- cbind(x.init, y.init)
 
     state0 <- c(xs[1,], 0 , 0)
-    if (is.null(parameters)) {
-      ## Estimate stochastic innovations
-      es <- xs[-1,] - xs[-nrow(xs),]
-
-      ## Estimate components of variance
-      V <- cov(es)
-      sigma <- sqrt(diag(V))
-      rho <- V[1, 2] / prod(sigma)
-
-      parameters <- list(
-        l_sigma = matrix(log(pmax(1e-08, sigma)),nbStates,2,byrow = TRUE),
-        l_rho_p = rep(log((1 + rho) / (1 - rho)),nbStates),
-        X = xs,
-        logD = rep(10,nbStates),
-        mu = t(xs),
-        v = t(xs) * 0,
-        l_psi = 0,
-        l_tau = c(0, 0),
-        l_rho_o = 0
-      )
+    
+    ## Estimate stochastic innovations
+    es <- xs[-1,] - xs[-nrow(xs),]
+    
+    ## Estimate components of variance
+    V <- cov(es)
+    sigma <- sqrt(diag(V))
+    rho <- V[1, 2] / prod(sigma)
+    
+    default_parameters <- list(
+      l_sigma = matrix(log(pmax(1e-08, sigma)),nbStates,2,byrow = TRUE),
+      l_rho_p = rep(log((1 + rho) / (1 - rho)),nbStates),
+      X = xs,
+      logD = rep(10,nbStates),
+      mu = t(xs),
+      v = t(xs) * 0,
+      l_psi = 0,
+      l_tau = c(0, 0),
+      l_rho_o = 0,
+      l_delta = rep(0,nbStates-1),
+      l_gamma = matrix(-1.5,1,nbStates*(nbStates-1))
+    )
+    
+    if(is.null(parameters)) parameters <- list()
+    
+    for(parms in names(default_parameters)){
+      if (is.null(parameters[[parms]])) {
+        parameters[[parms]] <- default_parameters[[parms]]
+      }
     }
 
     ## calculate prop'n of obs that are LS-derived
