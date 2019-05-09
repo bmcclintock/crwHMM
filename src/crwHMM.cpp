@@ -31,7 +31,7 @@ matrix<Type> make_T(Type beta, Type dt){
   T(0,1) = (1-exp(-beta*dt))/beta;
   T(1,1) = exp(-beta*dt);
   T(2,2) = 1;
-  T(2,1) = (1-exp(-beta*dt))/beta;
+  T(2,3) = (1-exp(-beta*dt))/beta;
   T(3,3) = exp(-beta*dt);
   return T;
 }
@@ -88,9 +88,9 @@ Type objective_function<Type>::operator() ()
   // Setup object for evaluating multivariate normal likelihood
   matrix<Type> Q(4,4);
   matrix<Type> T(4,4);
-  vector<Type> c_alpha(4);
   matrix<Type> mu(2,timeSteps);
   matrix<Type> cov_obs(2, 2);
+  cov_obs.setZero();
   
   // Set up initial Q
   Q(0,0) = Vmu0;
@@ -120,8 +120,8 @@ Type objective_function<Type>::operator() ()
       Type q = tau(1) * K(i,1);
       cov_obs(0,0) = s * s;
       cov_obs(1,1) = q * q;
-      cov_obs(0,1) = s * q * rho_o;
-      cov_obs(1,0) = cov_obs(0,1);
+      //cov_obs(0,1) = s * q * rho_o;
+      //cov_obs(1,0) = cov_obs(0,1);
     } else if(obs_mod(i) == 1) {
       // Argos Kalman Filter (or Kalman Smoothed) observations
       Type z = sqrt(Type(2.0));

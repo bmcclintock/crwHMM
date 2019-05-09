@@ -130,12 +130,11 @@ sfilter <-
       
       ## Estimate components of variance
       ar_es <- ar(es, order.max=1)
-      sigma <- mean(sqrt(diag(ar_es$var.pred)))
-      beta <- mean(-log(ar_es$ar[c(1,4)]))
-      alpha <- cbind(xs[,1], 0, xs[,2],0)
+      sigma <- mean(sqrt(diag(var(es))))
+      alpha <- cbind(xs[,1], c(0,es[,1]), xs[,2],c(0,es[,2]))
       
       parameters <- list(
-        log_beta= log(pmax(1e-08, beta)),
+        log_beta= -0.75,
         log_sigma = log(pmax(1e-08, sigma)),
         alpha=t(alpha),
         l_psi = 0,
@@ -150,7 +149,8 @@ sfilter <-
     map <- {
       if (pls == 1) {
         list(
-          l_psi = factor(NA)
+          l_psi = factor(NA),
+          l_rho_o = factor(NA)
         )
       } else if (pls == 0) {
         list(
@@ -158,7 +158,7 @@ sfilter <-
           l_rho_o = factor(NA)
         )
       } else if (pls > 0 & pls < 1) {
-        list()
+        list(l_rho_o = factor(NA))
       }
     }
     
@@ -272,7 +272,9 @@ sfilter <-
         tmb = obj,
         rep = rep,
         aic = aic,
-        time = proc.time() - st
+        time = proc.time() - st,
+        
+        report = obj$report()
       )
     } else {
       ## if optimiser fails
