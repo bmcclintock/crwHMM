@@ -14,6 +14,8 @@
 using namespace density;
 using std::sqrt;
 
+#define LOGZERO NAN;
+
 /* implement the vector - matrix product */
 template<class Type>
 vector<Type> multvecmat(array<Type>  A, matrix<Type>  B) {
@@ -88,14 +90,13 @@ template<class Type>
 Type forward_alg(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, int nbSteps) {
   int nbStates = trMat.cols();
   Type logalpha;
-  Type nan = sqrt(-2.0);
   matrix<Type> ltrMat(nbStates,nbStates);
   vector<Type> ldeltaG(nbStates);
   vector<Type> lalpha(nbStates);
   vector<Type> lnewalpha(nbStates);
-  Type sumalpha = nan;
+  Type sumalpha = LOGZERO;
   for(int j=0; j < nbStates; j++){
-    ldeltaG(j) = nan;
+    ldeltaG(j) = LOGZERO;
     for(int i=0; i < nbStates; i++){
       ltrMat(i,j) = eln(trMat(i,j));
       ldeltaG(j) = elnsum(ldeltaG(j),elnproduct(eln(delta(i)),ltrMat(i,j)));
@@ -106,9 +107,9 @@ Type forward_alg(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, i
   Type jnll = -sumalpha;
   lalpha -= sumalpha;
   for(int t=1; t < nbSteps; t++){
-    sumalpha = nan;
+    sumalpha = LOGZERO;
     for(int j=0; j < nbStates; j++){
-      logalpha = nan;
+      logalpha = LOGZERO;
       for(int i=0; i < nbStates; i++){
         logalpha = elnsum(logalpha,elnproduct(lalpha(i),ltrMat(i,j)));
       }
@@ -130,11 +131,10 @@ vector<int> viterbi(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs
   vector<Type> tmpphi(nbStates);
   vector<int> states(nbSteps);
   states.setOnes();
-  Type nan = sqrt(-2.0);
   matrix<Type> ltrMat(nbStates,nbStates);
   vector<Type> ldeltaG(nbStates);
   for(int j=0; j < nbStates; j++){
-    ldeltaG(j) = nan;
+    ldeltaG(j) = LOGZERO;
     for(int i=0; i < nbStates; i++){
       ltrMat(i,j) = eln(trMat(i,j));
       ldeltaG(j) = elnsum(ldeltaG(j),elnproduct(eln(delta(i)),ltrMat(i,j)));
@@ -164,11 +164,10 @@ matrix<Type> logAlpha(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnPro
   int nbStates = trMat.cols();
   Type logalpha;
   matrix<Type> elnalpha(nbSteps,nbStates);
-  Type nan = sqrt(-2.0);
   matrix<Type> ltrMat(nbStates,nbStates);
   vector<Type> ldeltaG(nbStates);
   for(int j=0; j < nbStates; j++){
-    ldeltaG(j) = nan;
+    ldeltaG(j) = LOGZERO;
     for(int i=0; i < nbStates; i++){
       ltrMat(i,j) = eln(trMat(i,j));
       ldeltaG(j) = elnsum(ldeltaG(j),elnproduct(eln(delta(i)),ltrMat(i,j)));
@@ -177,7 +176,7 @@ matrix<Type> logAlpha(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnPro
   }
   for(int t=1; t < nbSteps; t++){
     for(int j=0; j < nbStates; j++){
-      logalpha = nan;
+      logalpha = LOGZERO;
       for(int i=0; i < nbStates; i++){
         logalpha = elnsum(logalpha,elnproduct(elnalpha(t-1,i),ltrMat(i,j)));
       }
@@ -193,7 +192,6 @@ matrix<Type> logBeta(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProb
   int nbStates = trMat.cols();
   Type logbeta;
   matrix<Type> elnbeta(nbSteps,nbStates);
-  Type nan = sqrt(-2.0);
   matrix<Type> ltrMat(nbStates,nbStates);
   for(int j=0; j < nbStates; j++){
     elnbeta(nbSteps-1,j) = Type(0.0);
@@ -203,7 +201,7 @@ matrix<Type> logBeta(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProb
   }
   for(int t=(nbSteps-2); t >= 0; t--){
     for(int i=0; i < nbStates; i++){
-      logbeta = nan;
+      logbeta = LOGZERO;
       for(int j=0; j < nbStates; j++){
         logbeta = elnsum(logbeta,elnproduct(ltrMat(i,j),elnproduct(lnProbs(t+1,j),elnbeta(t+1,j))));
       }
@@ -219,10 +217,9 @@ matrix<Type> stProbs(matrix<Type> elnalpha, matrix<Type> elnbeta, int nbSteps) {
   int nbStates = elnalpha.cols();
   Type normalizer;
   matrix<Type> gamma(nbSteps,nbStates);
-  Type nan = sqrt(-2.0);
 
   for(int t=0; t < nbSteps; t++){
-    normalizer = nan;
+    normalizer = LOGZERO;
     for(int i=0; i < nbStates; i++){
       gamma(t,i) = elnproduct(elnalpha(t,i),elnbeta(t,i));
       normalizer = elnsum(normalizer,gamma(t,i));
