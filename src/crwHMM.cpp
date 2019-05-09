@@ -116,8 +116,7 @@ Type forward_alg(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, i
       sumalpha  = elnsum(sumalpha,lnewalpha(j));
     }
     jnll -= sumalpha;
-    lnewalpha -= sumalpha;
-    lalpha = lnewalpha;
+    lalpha = lnewalpha - sumalpha;
   }
   return jnll;
 }
@@ -287,9 +286,7 @@ template<class Type>
 	    for(int i=1; i < nbStates; i++){
 	      delta(i) = exp(l_delta(i-1));
 	    }
-  	  delta /= (delta.sum());
-  	  vector<Type> rowSums(nbStates);
-  	  rowSums.setZero();
+  	  delta /= delta.sum();
   	  int cpt = 0;
   	  for(int i=0;i<nbStates;i++){
         for(int j=0;j<nbStates;j++){
@@ -297,12 +294,8 @@ template<class Type>
             trMat(i,j) = Type(1.0);
             cpt++;
           } else trMat(i,j) = exp(l_gamma(0,i*nbStates+j-cpt));
-          // keep track of row sums, to normalize in the end
-          rowSums(i) += trMat(i,j);
         }
-        for(int j=0;j<nbStates;j++){
-          trMat(i,j) /= rowSums(i);
-        }
+        trMat.row(i) /= trMat.row(i).sum();
   	  }
 	  } else {
 	    delta(0) = Type(1.0);
