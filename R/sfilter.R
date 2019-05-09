@@ -376,6 +376,12 @@ sfilter <-
         aic = aic,
         time = proc.time() - st
       )
+      
+      if(nbStates>1) {
+        out$states <- obj$report()$states
+        out$stateProbs <- obj$report()$stateProbs
+      }
+      
     } else {
       ## if optimiser fails
       out <- list(

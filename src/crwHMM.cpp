@@ -69,37 +69,52 @@ Type elnproduct(Type x, Type y) {
   return C;
 }
 
+template <class Type>
+int which_max(vector<Type> x){
+  int first = 0;
+  int last = x.size()-1;
+  if (first==last) return last;
+  int largest = first;
+  
+  while (++first<last+1)
+    if (x(largest)<x(first))    
+      largest=first;
+    return largest;
+}
+
 
 /* Numerically stable forward algorithm based on http://bozeman.genome.washington.edu/compbio/mbt599_2006/hmm_scaling_revised.pdf */
 template<class Type>
-Type forward_alg(array<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, int nbSteps) {
+Type forward_alg(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, int nbSteps) {
   int nbStates = trMat.cols();
   Type logalpha;
   Type nan = sqrt(-2.0);
+  matrix<Type> ltrMat(nbStates,nbStates);
   vector<Type> ldeltaG(nbStates);
   vector<Type> lalpha(nbStates);
   vector<Type> lnewalpha(nbStates);
+  Type sumalpha = nan;
   for(int j=0; j < nbStates; j++){
     ldeltaG(j) = nan;
     for(int i=0; i < nbStates; i++){
-      ldeltaG(j) = elnsum(ldeltaG(j),elnproduct(eln(delta(i)),eln(trMat(i,j))));
+      ltrMat(i,j) = eln(trMat(i,j));
+      ldeltaG(j) = elnsum(ldeltaG(j),elnproduct(eln(delta(i)),ltrMat(i,j)));
     }
     lalpha(j) = elnproduct(ldeltaG(j),lnProbs(0,j));
+    sumalpha  = elnsum(sumalpha,lalpha(j));
   }
-  Type maxalpha = max(lalpha);
-  Type sumalpha = maxalpha + log(exp(lalpha-maxalpha).sum());
   Type jnll = -sumalpha;
   lalpha -= sumalpha;
   for(int t=1; t < nbSteps; t++){
+    sumalpha = nan;
     for(int j=0; j < nbStates; j++){
       logalpha = nan;
       for(int i=0; i < nbStates; i++){
-        logalpha = elnsum(logalpha,elnproduct(lalpha(i),eln(trMat(i,j))));
+        logalpha = elnsum(logalpha,elnproduct(lalpha(i),ltrMat(i,j)));
       }
       lnewalpha(j) = elnproduct(logalpha,lnProbs(t,j));
+      sumalpha  = elnsum(sumalpha,lnewalpha(j));
     }
-    maxalpha = max(lnewalpha);
-    sumalpha = maxalpha + log(exp(lnewalpha-maxalpha).sum());
     jnll -= sumalpha;
     lnewalpha -= sumalpha;
     lalpha = lnewalpha;
@@ -107,18 +122,57 @@ Type forward_alg(array<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, in
   return jnll;
 }
 
-/* Numerically stable forward probabilities based on http://bozeman.genome.washington.edu/compbio/mbt599_2006/hmm_scaling_revised.pdf */
+/* Numerically stable viterbi based on Rabiner 1989 IEEE 77(2):257-286 */
 template<class Type>
-matrix<Type> logAlpha(array<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, int nbSteps) {
+vector<int> viterbi(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, int nbSteps) {
   int nbStates = trMat.cols();
-  Type logalpha;
-  matrix<Type> elnalpha(nbSteps,nbStates);
+  matrix<Type> phi(nbSteps,nbStates);
+  matrix<int> psi(nbSteps,nbStates);
+  vector<Type> tmpphi(nbStates);
+  vector<int> states(nbSteps);
+  states.setOnes();
   Type nan = sqrt(-2.0);
+  matrix<Type> ltrMat(nbStates,nbStates);
   vector<Type> ldeltaG(nbStates);
   for(int j=0; j < nbStates; j++){
     ldeltaG(j) = nan;
     for(int i=0; i < nbStates; i++){
-      ldeltaG(j) = elnsum(ldeltaG(j),elnproduct(eln(delta(i)),eln(trMat(i,j))));
+      ltrMat(i,j) = eln(trMat(i,j));
+      ldeltaG(j) = elnsum(ldeltaG(j),elnproduct(eln(delta(i)),ltrMat(i,j)));
+    }
+    psi(0,j) = 0;
+    phi(0,j) = elnsum(ldeltaG(j),lnProbs(0,j));
+  }
+  for(int t=1; t < nbSteps; t++){
+    for(int j=0; j < nbStates; j++){
+      for(int i=0; i < nbStates; i++){
+        tmpphi(i) = phi(t-1,i) + ltrMat(i,j);
+      }
+      psi(t,j) = which_max(tmpphi);
+      phi(t,j) = tmpphi(psi(t,j)) + lnProbs(t,j);
+    }
+  }
+  states(nbSteps-1) += which_max(vector<Type>(phi.row(nbSteps-1)));
+  for(int t=0; t<(nbSteps-1); t++){
+    states(nbSteps-2-t) += psi(nbSteps-1-t,states(nbSteps-1-t)-1);
+  }
+  return states;
+}
+
+/* Numerically stable forward log-probabilities based on http://bozeman.genome.washington.edu/compbio/mbt599_2006/hmm_scaling_revised.pdf */
+template<class Type>
+matrix<Type> logAlpha(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, int nbSteps) {
+  int nbStates = trMat.cols();
+  Type logalpha;
+  matrix<Type> elnalpha(nbSteps,nbStates);
+  Type nan = sqrt(-2.0);
+  matrix<Type> ltrMat(nbStates,nbStates);
+  vector<Type> ldeltaG(nbStates);
+  for(int j=0; j < nbStates; j++){
+    ldeltaG(j) = nan;
+    for(int i=0; i < nbStates; i++){
+      ltrMat(i,j) = eln(trMat(i,j));
+      ldeltaG(j) = elnsum(ldeltaG(j),elnproduct(eln(delta(i)),ltrMat(i,j)));
     }
     elnalpha(0,j) = elnproduct(ldeltaG(j),lnProbs(0,j));
   }
@@ -126,12 +180,59 @@ matrix<Type> logAlpha(array<Type> delta, matrix<Type> trMat, matrix<Type> lnProb
     for(int j=0; j < nbStates; j++){
       logalpha = nan;
       for(int i=0; i < nbStates; i++){
-        logalpha = elnsum(logalpha,elnproduct(elnalpha(t-1,i),eln(trMat(i,j))));
+        logalpha = elnsum(logalpha,elnproduct(elnalpha(t-1,i),ltrMat(i,j)));
       }
       elnalpha(t,j) = elnproduct(logalpha,lnProbs(t,j));
     }
   }
   return elnalpha;
+}
+
+/* Numerically stable backward log-probabilities based on http://bozeman.genome.washington.edu/compbio/mbt599_2006/hmm_scaling_revised.pdf */
+template<class Type>
+matrix<Type> logBeta(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, int nbSteps) {
+  int nbStates = trMat.cols();
+  Type logbeta;
+  matrix<Type> elnbeta(nbSteps,nbStates);
+  Type nan = sqrt(-2.0);
+  matrix<Type> ltrMat(nbStates,nbStates);
+  for(int j=0; j < nbStates; j++){
+    elnbeta(nbSteps-1,j) = Type(0.0);
+    for(int i=0; i < nbStates; i++){
+      ltrMat(i,j) = eln(trMat(i,j));
+    }
+  }
+  for(int t=(nbSteps-2); t >= 0; t--){
+    for(int i=0; i < nbStates; i++){
+      logbeta = nan;
+      for(int j=0; j < nbStates; j++){
+        logbeta = elnsum(logbeta,elnproduct(ltrMat(i,j),elnproduct(lnProbs(t+1,j),elnbeta(t+1,j))));
+      }
+      elnbeta(t,i) = logbeta;
+    }
+  }
+  return elnbeta;
+}
+
+/* Numerically stable state probabilities based on http://bozeman.genome.washington.edu/compbio/mbt599_2006/hmm_scaling_revised.pdf */
+template<class Type>
+matrix<Type> stProbs(matrix<Type> elnalpha, matrix<Type> elnbeta, int nbSteps) {
+  int nbStates = elnalpha.cols();
+  Type normalizer;
+  matrix<Type> gamma(nbSteps,nbStates);
+  Type nan = sqrt(-2.0);
+
+  for(int t=0; t < nbSteps; t++){
+    normalizer = nan;
+    for(int i=0; i < nbStates; i++){
+      gamma(t,i) = elnproduct(elnalpha(t,i),elnbeta(t,i));
+      normalizer = elnsum(normalizer,gamma(t,i));
+    }
+    for(int i=0; i < nbStates; i++){
+      gamma(t,i) = eexp(elnproduct(gamma(t,i),-normalizer));
+    }
+  }
+  return gamma;
 }
 
 template<class Type>
@@ -179,7 +280,7 @@ template<class Type>
 
 	  // Transform parameters
 	  matrix<Type> sigma(nbStates,2);
-	  array<Type> delta(nbStates);
+	  vector<Type> delta(nbStates);
 	  matrix<Type> trMat(nbStates,nbStates);
 	  if(nbStates>1){
   	  delta(0) = Type(1.0);
@@ -357,15 +458,8 @@ template<class Type>
     
     // forward algorithm
     Type hmmll = forward_alg(delta, trMat, allProbs, nbSteps);
-    //matrix<Type> lalpha = logAlpha(delta, trMat, allProbs, nbSteps);
-    //Type hmmll2 = sqrt(-2.0);
-    //for(int i=0; i < nbStates; i++){
-    //  hmmll2 = elnsum(hmmll2,lalpha(nbSteps-1,i));
-    //}
-    jnll += hmmll;
     REPORT(hmmll);
-    //REPORT(lalpha);
-    //REPORT(hmmll2);
+    jnll += hmmll;
 
     if(proc_mod == 0) {
       ADREPORT(rho_p);
@@ -377,6 +471,14 @@ template<class Type>
     ADREPORT(tau);
     ADREPORT(psi);
     if(nbStates>1){
+      vector<int> states = viterbi(delta, trMat, allProbs, nbSteps);
+      REPORT(states);
+      matrix<Type> lalpha = logAlpha(delta, trMat, allProbs, nbSteps);
+      REPORT(lalpha);
+      matrix<Type> lbeta = logBeta(delta, trMat, allProbs, nbSteps);
+      REPORT(lbeta);
+      matrix<Type> stateProbs = stProbs(lalpha, lbeta, nbSteps); 
+      REPORT(stateProbs);
       ADREPORT(delta);
       ADREPORT(trMat);
     }
