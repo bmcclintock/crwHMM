@@ -4,14 +4,12 @@
 \alias{sfilter}
 \title{fit the state-space model to \code{prefilter}-ed data}
 \usage{
-sfilter(x, model = c("rw", "crw"), time.step = 6, parameters = NULL,
-  fit.to.subset = TRUE, optim = c("nlminb", "optim"),
-  verbose = FALSE, inner.control = NULL, nbStates = 1)
+sfilter(x, time.step = 6, parameters = NULL, fit.to.subset = TRUE,
+  optim = c("nlminb", "optim"), verbose = FALSE,
+  inner.control = NULL, nbStates = 1)
 }
 \arguments{
 \item{x}{Argos data passed through prefilter()}
-
-\item{model}{specify which SSM is to be fit: "rw" or "crw"}
 
 \item{time.step}{the regular time interval, in hours, to predict to.
 Alternatively, a vector of prediction times, possibly not regular, must be

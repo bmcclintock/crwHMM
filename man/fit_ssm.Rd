@@ -5,10 +5,9 @@
 \title{Fit a continuous-time state-space model to filter Argos satellite geolocation data}
 \usage{
 fit_ssm(d, vmax = 50, ang = -1, distlim = c(2500, 5000),
-  spdf = TRUE, min.dt = 60, pf = FALSE, model = "rw",
-  time.step = 6, parameters = NULL, fit.to.subset = TRUE,
-  optim = "nlminb", verbose = 1, inner.control = NULL,
-  nbStates = 1)
+  spdf = TRUE, min.dt = 60, pf = FALSE, time.step = 6,
+  parameters = NULL, fit.to.subset = TRUE, optim = "nlminb",
+  verbose = 1, inner.control = NULL, nbStates = 1)
 }
 \arguments{
 \item{d}{a data frame of observations including Argos KF error ellipse info}
@@ -28,9 +27,6 @@ for details}
 dt <= min.dt will be ignored by the SSM}
 
 \item{pf}{just pre-filter the data, do not fit the ctrw (default is FALSE)}
-
-\item{model}{fit either a simple random walk ("rw") or correlated random walk
-("crw") as a continuous-time process model}
 
 \item{time.step}{the regular time interval, in hours, to predict to.
 Alternatively, a vector of prediction times, possibly not regular, must be

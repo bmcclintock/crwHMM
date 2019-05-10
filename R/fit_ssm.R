@@ -15,8 +15,6 @@
 ##' @param min.dt minimum allowable time difference between observations;
 ##' dt <= min.dt will be ignored by the SSM
 ##' @param pf just pre-filter the data, do not fit the ctrw (default is FALSE)
-##' @param model fit either a simple random walk ("rw") or correlated random walk
-##' ("crw") as a continuous-time process model
 ##' @param time.step the regular time interval, in hours, to predict to.
 ##' Alternatively, a vector of prediction times, possibly not regular, must be
 ##' specified as a data.frame with id and POSIXt dates.
@@ -73,7 +71,6 @@ fit_ssm <- function(d,
                     spdf = TRUE,
                     min.dt = 60,
                     pf = FALSE,
-                    model = "rw",
                     time.step = 6,
                     parameters = NULL,
                     fit.to.subset = TRUE,
@@ -119,7 +116,6 @@ fit_ssm <- function(d,
     fit <- fit %>%
       do(ssm = try(sfilter(
         .$pf,
-        model = model,
         time.step = time.step,
         parameters = parameters,
         fit.to.subset = fit.to.subset,

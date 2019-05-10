@@ -69,7 +69,7 @@ model fitting is comprised of 2 steps: a prefilter step where a number of checks
 ## load crwHMM example data
 data(ellie)
 ## prefilter and fit Random Walk SSM, using a 24 h time step
-fit <- fit_ssm(ellie, model = "rw", time.step = 24)
+fit <- fit_ssm(ellie, model = "rw", time.step = 1)
 ```
 these are the minimum arguments required: the input data, the model ("rw" or "crw") and the time.step (in h) to which locations are predicted. Additional control can be exerted over the prefiltering step, via the `vmax`, `ang`, `distlim`, `spdf` and `min.dt` arguments. see `?crwHMM::fit_ssm` for details, the defaults for these arguments are quite conservative, usually leading to relative few observations being flagged to be ignored by the SSM. Additional control over the SSM fitting step can also be exerted but these should rarely need to be accessed by users and will not be dealt with here.
 
