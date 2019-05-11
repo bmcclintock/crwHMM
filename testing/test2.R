@@ -16,17 +16,6 @@ fit_crwHMM <-
 
 fit_crwHMM$opt$par
 
-fit2_crwHMM <- 
-  sfilter(
-    x = ellie,
-    time.step = 24,
-    fit.to.subset = FALSE,
-    optim="nlminb",
-    verbose = FALSE,nbStates=2
-  )
-
-fit_crwHMM$opt$par
-
 ############
 # crawl fit
 
@@ -50,3 +39,13 @@ rbind(
 ) %>% `rownames<-`(c("crwHMM","crawl"))
 
 
+
+data(ellie)
+fit2_crwHMM <- 
+  fit_ssm(
+    d = ellie,
+    time.step = 24,
+    nbStates=2
+  )
+plot(fit2_crwHMM$ssm[[1]]$predicted$x,fit2_crwHMM$ssm[[1]]$predicted$y,col=fit2_crwHMM$ssm[[1]]$states+1)
+fit2_crwHMM$ssm[[1]]$par
