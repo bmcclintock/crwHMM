@@ -341,6 +341,8 @@ template<class Type>
     matrix<Type> allProbs(nbSteps,nbStates);
     allProbs.setZero();
     vector<Type> x;
+    vector<Type> delta0(nbStates);
+    
     
   	// crwHMM PROCESS MODEL
     	
@@ -353,7 +355,7 @@ template<class Type>
       Q(3,3) = Q(1,1);
 
       x = alpha.col(0)-alpha0.matrix();
-      delta(state) = eexp(elnproduct(eln(delta(state)),-MVNORM(Q)(x)));
+      delta0(state) = eexp(elnproduct(eln(delta(state)),-MVNORM(Q)(x)));
       
     	int count = 1;
   	  for(int t=0; t < nbSteps; t++){
@@ -401,7 +403,7 @@ template<class Type>
     }
     
       // forward algorithm
-    Type hmmll = forward_alg(delta, trMat, allProbs, nbSteps);
+    Type hmmll = forward_alg(delta0, trMat, allProbs, nbSteps);
     REPORT(hmmll);
     nll += hmmll;
 
@@ -412,11 +414,11 @@ template<class Type>
     ADREPORT(psi);
   
     if(nbStates>1){
-      vector<int> states = viterbi(delta, trMat, allProbs, nbSteps);
+      vector<int> states = viterbi(delta0, trMat, allProbs, nbSteps);
       REPORT(states);
-      matrix<Type> lalpha = logAlpha(delta, trMat, allProbs, nbSteps);
+      matrix<Type> lalpha = logAlpha(delta0, trMat, allProbs, nbSteps);
       REPORT(lalpha);
-      matrix<Type> lbeta = logBeta(delta, trMat, allProbs, nbSteps);
+      matrix<Type> lbeta = logBeta(delta0, trMat, allProbs, nbSteps);
       REPORT(lbeta);
       matrix<Type> stateProbs = stProbs(lalpha, lbeta, nbSteps); 
       REPORT(stateProbs);
