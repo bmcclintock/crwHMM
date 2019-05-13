@@ -93,19 +93,18 @@ sfilter <-
         filter(id == unique(d$id)) %>%
         select(date)
     }
-    
-    # get number of observations per time interval
-    nbSteps <- length(ts$date)-1
-    nbObs <- numeric(nbSteps)
-    obsInt <- findInterval(d$date,ts$date)
-    nbObs[unique(obsInt)] <- table(obsInt)
-    nbObs <- nbObs + 1 # add end predicted location for each time step
 
     ## merge data and interpolation times
     d.all <- full_join(d, ts, by = "date") %>%
       arrange(date) %>%
       mutate(isd = ifelse(is.na(isd), FALSE, isd)) %>%
       mutate(id = ifelse(is.na(id), na.omit(unique(id))[1], id))
+    
+    # get number of observations per time interval
+    nbSteps <- length(ts$date)-1
+    nbObs <- numeric(nbSteps)
+    obsInt <- findInterval(d.all$date,ts$date)
+    nbObs[unique(obsInt)] <- table(obsInt)
 
     ## calc delta times in hours for observations & interpolation points (states)
     dt <- difftime(d.all$date, lag(d.all$date), units = "hours") %>%
