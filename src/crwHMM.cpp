@@ -279,10 +279,6 @@ template<class Type>
     PARAMETER_VECTOR(log_sigma);
     // random variables
     PARAMETER_MATRIX(alpha); /* State matrix */
-
-    // initial state and t.p.m. parameters
-    PARAMETER_VECTOR(l_delta); // initial distribution (mlogit scale) - should be of length nbStates - 1
-    PARAMETER_MATRIX(l_gamma); // t.p.m. (mlogit scale) - should be 1 x (nbStates-1) * nbStates
   
     // OBSERVATION PARAMETERS
     // for KF OBS MODEL
@@ -290,6 +286,10 @@ template<class Type>
     // for LS OBS MODEL
     PARAMETER_VECTOR(l_tau);     	// error dispersion for LS obs model (log scale)
     PARAMETER(l_rho_o);             // error correlation
+    
+    // initial state and t.p.m. parameters
+    PARAMETER_VECTOR(l_delta); // initial distribution (mlogit scale) - should be of length nbStates - 1
+    PARAMETER_MATRIX(l_gamma); // t.p.m. (mlogit scale) - should be 1 x (nbStates-1) * nbStates
     
     // Transform parameters
     vector<Type> beta(nbStates);
