@@ -9,7 +9,7 @@ using std::sqrt;
 
 /* implement the vector - matrix product */
 template<class Type>
-vector<Type> multvecmat(array<Type>  A, matrix<Type>  B) {
+vector<Type> multvecmat(vector<Type>  A, matrix<Type>  B) {
   int nrowb = B.rows();
   int ncolb = B.cols(); 
   vector<Type> C(ncolb);
@@ -21,6 +21,12 @@ vector<Type> multvecmat(array<Type>  A, matrix<Type>  B) {
     }
   }
   return C;
+}
+
+/* vector - matrix multiplication using atomic::matmal */
+template<class Type>
+vector<Type> multiply(vector<Type> x, matrix<Type> y){
+  return atomic::matmul(matrix<Type>(x.matrix()),y).vec();
 }
 
 template<class Type>
@@ -109,6 +115,26 @@ Type forward_alg(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, i
     }
     jnll -= sumalpha;
     lalpha = lnewalpha - sumalpha;
+  }
+  return jnll;
+}
+
+/* forward algorithm using only scaling; this blows up when calculating exp(lnProbs) */
+template<class Type>
+Type forward_alg_scale(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs, int nbSteps) {
+  int nbStates = trMat.cols();
+
+  Type sumalpha;
+  Type jnll = Type(0.0);
+  vector<Type> Probs(nbStates);
+  vector<Type> alpha = delta;
+  
+  for(int t=0; t < nbSteps; t++){
+    Probs = exp(vector<Type>(lnProbs.row(t)));
+    alpha = multvecmat(alpha,trMat) * Probs;
+    sumalpha = alpha.sum();
+    jnll -= log(sumalpha);
+    alpha /= sumalpha;
   }
   return jnll;
 }
@@ -227,14 +253,15 @@ template<class Type>
 matrix<Type> make_Q(Type beta, Type sigma2, Type dt){
   matrix<Type> Q(4,4);
   Q.setZero();
-  Q(0,0) = sigma2 * (dt -(2/beta)*(1-exp(-beta*dt)) + (1/(2*beta))*(1-exp(-2*beta*dt)));
-  Q(1,1) = sigma2*beta*(1-exp(-2*beta*dt))/2;
-  Q(0,1) = sigma2*(1 - 2*exp(-beta*dt) + exp(-2*beta*dt))/2;
-  Q(1,0) = sigma2*(1 - 2*exp(-beta*dt) + exp(-2*beta*dt))/2;
-  Q(2,2) = sigma2 * (dt -(2/beta)*(1-exp(-beta*dt)) + (1/(2*beta))*(1-exp(-2*beta*dt)));
-  Q(3,3) = sigma2*beta*(1-exp(-2*beta*dt))/2;
-  Q(2,3) = sigma2*(1 - 2*exp(-beta*dt) + exp(-2*beta*dt))/2;
-  Q(3,2) = sigma2*(1 - 2*exp(-beta*dt) + exp(-2*beta*dt))/2;
+  Type expBetaDT = exp(-beta*dt);
+  Q(0,0) = sigma2 * (dt -(Type(2.0)/beta)*(Type(1.0)-expBetaDT) + (Type(1.0)/(Type(2.0)*beta))*(Type(1.0)-expBetaDT * expBetaDT));
+  Q(1,1) = sigma2 * beta*(Type(1.0)-expBetaDT * expBetaDT)/Type(2.0);
+  Q(0,1) = sigma2 * (Type(1.0) - Type(2.0)*expBetaDT + expBetaDT * expBetaDT)/Type(2.0);
+  Q(1,0) = Q(0,1);
+  Q(2,2) = Q(0,0);
+  Q(3,3) = Q(1,1);
+  Q(2,3) = Q(0,1);
+  Q(3,2) = Q(0,1);
   return Q;
 }
 
@@ -243,12 +270,13 @@ template<class Type>
 matrix<Type> make_T(Type beta, Type dt){
   matrix<Type> T(4,4);
   T.setZero();
-  T(0,0) = 1; 
-  T(0,1) = (1-exp(-beta*dt))/beta;
-  T(1,1) = exp(-beta*dt);
-  T(2,2) = 1;
-  T(2,3) = (1-exp(-beta*dt))/beta;
-  T(3,3) = exp(-beta*dt);
+  Type expBetaDT = exp(-beta*dt);
+  T(0,0) = Type(1.0); 
+  T(0,1) = (Type(1.0)-expBetaDT)/beta;
+  T(1,1) = expBetaDT;
+  T(2,2) = Type(1.0);
+  T(2,3) = T(0,1);
+  T(3,3) = T(1,1);
   return T;
 }
 
@@ -304,25 +332,20 @@ template<class Type>
 
 	  vector<Type> delta(nbStates);
 	  matrix<Type> trMat(nbStates,nbStates);
-	  if(nbStates>1){
-  	  delta(0) = Type(1.0);
-	    for(int i=1; i < nbStates; i++){
-	      delta(i) = exp(l_delta(i-1));
-	    }
-  	  delta /= delta.sum();
-  	  int cpt = 0;
-  	  for(int i=0;i<nbStates;i++){
-        for(int j=0;j<nbStates;j++){
-          if(i==j) {
-            trMat(i,j) = Type(1.0);
-            cpt++;
-          } else trMat(i,j) = exp(l_gamma(0,i*nbStates+j-cpt));
-        }
-        trMat.row(i) /= trMat.row(i).sum();
-  	  }
-	  } else {
-	    delta(0) = Type(1.0);
-	    trMat(0,0) = Type(1.0);
+	  delta(0) = Type(1.0);
+    for(int i=1; i < nbStates; i++){
+      delta(i) = exp(l_delta(i-1));
+    }
+	  delta /= delta.sum();
+	  int cpt = 0;
+	  for(int i=0;i<nbStates;i++){
+      for(int j=0;j<nbStates;j++){
+        if(i==j) {
+          trMat(i,j) = Type(1.0);
+          cpt++;
+        } else trMat(i,j) = exp(l_gamma(0,i*nbStates+j-cpt));
+      }
+      trMat.row(i) /= trMat.row(i).sum();
 	  }
 
     int timeSteps = dt.size();
@@ -349,6 +372,7 @@ template<class Type>
     for(int state = 0; state < nbStates; state++){
       
       // acount for initial distribution and initial state of CTCRW
+      Q.setZero();
       Q(0,0) = Vmu0;
       Q(1,1) = sigma2(state)*beta(state)/2;
       Q(2,2) = Vmu0;

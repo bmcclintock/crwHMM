@@ -45,7 +45,8 @@ fit2_crwHMM <-
   fit_ssm(
     d = ellie,
     time.step = 24,
-    nbStates=2
+    nbStates=2,
+    verbose=2
   )
 plot(fit2_crwHMM$ssm[[1]]$predicted$x,fit2_crwHMM$ssm[[1]]$predicted$y,col=fit2_crwHMM$ssm[[1]]$states+1)
 fit2_crwHMM$ssm[[1]]$par
