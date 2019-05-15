@@ -39,14 +39,35 @@ rbind(
 ) %>% `rownames<-`(c("crwHMM","crawl"))
 
 
-
-data(ellie)
+# lc with 2 states
 fit2_crwHMM <- 
+  sfilter(
+    x = ellie,
+    time.step = 24,
+    fit.to.subset = FALSE,
+    optim="nlminb",
+    verbose = 2,
+    nbStates=2
+  )
+plot(fit2_crwHMM$predicted$x,fit2_crwHMM$predicted$y,col=fit2_crwHMM$states+1)
+fit2_crwHMM$par
+
+# KF with 1 state
+data(ellie)
+fit_crwHMM_kf <- 
+  fit_ssm(
+    d = ellie,
+    time.step = 24
+  )
+fit_crwHMM_kf$ssm[[1]]$opt$par
+
+# KF with 2 states
+fit2_crwHMM_kf <- 
   fit_ssm(
     d = ellie,
     time.step = 24,
     nbStates=2,
     verbose=2
   )
-plot(fit2_crwHMM$ssm[[1]]$predicted$x,fit2_crwHMM$ssm[[1]]$predicted$y,col=fit2_crwHMM$ssm[[1]]$states+1)
-fit2_crwHMM$ssm[[1]]$par
+plot(fit2_crwHMM_kf$ssm[[1]]$predicted$x,fit2_crwHMM_kf$ssm[[1]]$predicted$y,col=fit2_crwHMM_kf$ssm[[1]]$states+1)
+fit2_crwHMM_kf$ssm[[1]]$opt$par
