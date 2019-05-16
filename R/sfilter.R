@@ -148,8 +148,8 @@ sfilter <-
         l_psi = 0,
         l_tau = c(0, 0),
         l_rho_o = 0,
-        l_delta = rep(0,nbStates-1),
-        l_gamma = matrix(-1.5,1,nbStates*(nbStates-1))
+        l_delta = rep(0,max(1,nbStates-1)),
+        l_gamma = matrix(-1.5,1,max(1,nbStates*(nbStates-1)))
     )
     
     if(is.null(parameters)) parameters <- list()
@@ -178,6 +178,11 @@ sfilter <-
       } else if (pls > 0 & pls < 1) {
         list(l_rho_o = factor(NA))
       }
+    }
+    
+    if(nbStates==1){
+      map$l_delta = factor(NA)
+      map$l_gamma = factor(NA)
     }
     
     ## TMB - data list
