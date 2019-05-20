@@ -381,14 +381,14 @@ template<class Type>
       x = alpha.col(0)-alpha0.matrix();
       delta0(state) = eexp(elnproduct(eln(delta(state)),-MVNORM(Q)(x)));
       
-    	int count = 1;
+    	int count = 0;
   	  for(int t=0; t < nbSteps; t++){
         for(int i = 0; i < nbObs[t]; i++) {
+          count++;
           Q = make_Q(beta(state), sigma2(state), dt(count));
           T = make_T(beta(state), dt(count));
           x = alpha.col(count) - T * alpha.col(count-1);
           allProbs(t,state) -= MVNORM(Q)(x);
-          count += 1;
         }
   	  }
     }
