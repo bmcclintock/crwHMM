@@ -123,7 +123,7 @@ sfilter <-
       y.init[which(is.na(y.init))[1] - 1]
     xs <- cbind(x.init, y.init)
     
-    alpha0 <- c(xs[1,1], 0 , xs[1,2], 0)
+    mu0 <- c(xs[1,1], xs[1,2])
     if (is.null(parameters)) {
       ## Estimate stochastic innovations
       es <- (xs[-1,] - xs[-nrow(xs),])/dt[-1]
@@ -131,12 +131,12 @@ sfilter <-
       ## Estimate components of variance
       ar_es <- ar(es, order.max=1)
       sigma <- mean(sqrt(diag(var(es))))
-      alpha <- cbind(xs[,1], c(0,es[,1]), xs[,2],c(0,es[,2]))
+      mu <- cbind(xs[,1], xs[,2])
       
       parameters <- list(
         log_beta= -0.75,
         log_sigma = log(pmax(1e-08, sigma)),
-        alpha=t(alpha),
+        mu=t(mu),
         l_psi = 0,
         l_tau = c(0, 0),
         l_rho_o = 0
@@ -165,8 +165,8 @@ sfilter <-
     ## TMB - data list
     data <- list(
       Y = rbind(d.all$x, d.all$y),
-      alpha0 = alpha0,
-      Vmu0 = max(sqrt(diag(var(cbind(d.all$x, d.all$y),na.rm=T))))^2,
+      mu0 = mu0,
+      V0 = max(sqrt(diag(var(cbind(d.all$x, d.all$y),na.rm=T)))),
       dt = dt,
       isd = as.integer(d.all$isd),
       obs_mod = ifelse(d.all$obs.type == "LS", 0, 1),
@@ -185,7 +185,7 @@ sfilter <-
         data,
         parameters,
         map = map,
-        random = c("alpha"),
+        random = c("mu"),
         DLL = "crwHMM",
         hessian = TRUE,
         silent = !verbose,
@@ -228,22 +228,23 @@ sfilter <-
       message("Estmating locations...")
       fxd <- summary(rep, "report")
       tmp <- summary(rep, "random")
-      alpha_idx <- rep(c(1:4), nrow(d.all))
-      loc <- cbind(tmp[alpha_idx == 1,1], tmp[alpha_idx == 3,1],
-                   tmp[alpha_idx == 1,2],tmp[alpha_idx == 3,2])
+      alpha_idx <- rep(c(1:2), nrow(d.all))
+      loc <- cbind(tmp[alpha_idx == 1,1], tmp[alpha_idx == 2,1],
+                   tmp[alpha_idx == 1,2],tmp[alpha_idx == 2,2])
       colnames(loc) <- c("x", "y", "x.se", "y.se")
       loc <- as_tibble(loc)
-      vel <- cbind(tmp[alpha_idx == 2,1], tmp[alpha_idx == 4,1],
-                   tmp[alpha_idx == 2,2],tmp[alpha_idx == 4,2])
-      colnames(vel) <- c("u", "v", "u.se", "v.se")
-      vel <- as_tibble(vel)
-      rdm <- bind_cols(loc, vel) %>%
+      # vel <- cbind(tmp[alpha_idx == 2,1], tmp[alpha_idx == 4,1],
+      #              tmp[alpha_idx == 2,2],tmp[alpha_idx == 4,2])
+      # colnames(vel) <- c("u", "v", "u.se", "v.se")
+      # vel <- as_tibble(vel)
+      rdm <- loc %>% #bind_cols(loc, vel) %>%
         mutate(
           id = unique(d.all$id),
           date = d.all$date,
           isd = d.all$isd
         ) %>%
-        select(id, date, x, y, x.se, y.se, u, v, u.se, v.se, isd)
+        # select(id, date, x, y, x.se, y.se, u, v, u.se, v.se, isd)
+        select(id, date, x, y, x.se, y.se, isd)
       ## Fitted values (estimated locations at observation times)
       fd <- rdm %>%
         filter(isd) %>%
