@@ -8,14 +8,16 @@ ellie <- ellie %>% select(-smaj,-smin,-eor) %>% prefilter(ellie)
 fit_crwHMM <- 
   sfilter(
     x = ellie,
-    time.step = 12,
-    fit.to.subset = TRUE,
-    optim="optim",
+    time.step = 24,
+    fit.to.subset = FALSE,
+    optim="nlminb",
     verbose = FALSE
   )
 
 fit_crwHMM$opt$par
 plot(y~x, fit_crwHMM$predicted, asp=1, cex=0.25, pch=16)
+
+mu <- summary(fit_crwHMM$rep,"fixed") %>% rownames()
 
 ############
 # crawl fit

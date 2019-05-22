@@ -223,7 +223,7 @@ sfilter <-
     ## if error then exit with limited output to aid debugging
     rep <- suppressWarnings(try(sdreport(obj)))
     if (!inherits(opt, "try-error") & !inherits(rep, "try-error")) {
-      
+     # return(list(rep=rep, obj=obj, opt=opt) )
       ## Parameters, states and the fitted values
       message("Estmating locations...")
       fxd <- summary(rep, "report")
