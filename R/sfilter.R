@@ -100,7 +100,8 @@ sfilter <-
     # get number of observations per time interval
     nbSteps <- length(ts$date)-1
     nbObs <- numeric(nbSteps)
-    obsInt <- findInterval(d.all$date,ts$date)
+    obsInt <- findInterval(d.all$date[-(1:2)],ts$date,all.inside=TRUE) # don't include first 2 observations
+    secondObs <- obsInt[2] # time step for first 2nd observation
     nbObs[unique(obsInt)] <- table(obsInt)
 
     ## calc delta times in hours for observations & interpolation points (states)
@@ -130,26 +131,26 @@ sfilter <-
     y.init[which(is.na(y.init))] <-
       y.init[which(is.na(y.init))[1] - 1]
     xs <- cbind(x.init, y.init)
-
-    alpha0 <- c(xs[1,1], 0 , xs[1,2], 0)
     
+    mu0 <- c(xs[1,1], xs[1,2])
+
     ## Estimate stochastic innovations
     es <- (xs[-1,] - xs[-nrow(xs),])/dt[-1]
     
     ## Estimate components of variance
     ar_es <- ar(es, order.max=1)
     sigma <- mean(sqrt(diag(var(es))))
-    alpha <- cbind(xs[,1], c(0,es[,1]), xs[,2],c(0,es[,2]))
+    mu <- cbind(xs[,1], xs[,2])
     
     default_parameters <- list(
-        log_beta= rep(-0.75,nbStates),
-        log_sigma = rep(log(pmax(1e-08, sigma)),nbStates),
-        alpha=t(alpha),
-        l_psi = 0,
-        l_tau = c(0, 0),
-        l_rho_o = 0,
-        l_delta = rep(0,max(1,nbStates-1)),
-        l_gamma = matrix(-1.5,1,max(1,nbStates*(nbStates-1)))
+      log_beta= rep(-0.75,nbStates),
+      log_sigma = rep(log(pmax(1e-08, sigma)),nbStates),
+      mu=t(mu),
+      l_psi = 0,
+      l_tau = c(0, 0),
+      l_rho_o = 0,
+      l_delta = rep(0,max(1,nbStates-1)),
+      l_gamma = matrix(-1.5,1,max(1,nbStates*(nbStates-1)))
     )
     
     if(is.null(parameters)) parameters <- list()
@@ -188,8 +189,8 @@ sfilter <-
     ## TMB - data list
     data <- list(
       Y = rbind(d.all$x, d.all$y),
-      alpha0 = alpha0,
-      Vmu0 = max(sqrt(diag(var(cbind(d.all$x, d.all$y),na.rm=T))))^2,
+      mu0 = mu0,
+      V0 = max(sqrt(diag(var(cbind(d.all$x, d.all$y),na.rm=T)))),
       dt = dt,
       isd = as.integer(d.all$isd),
       obs_mod = ifelse(d.all$obs.type == "LS", 0, 1),
@@ -199,7 +200,8 @@ sfilter <-
       K = cbind(d.all$amf_x, d.all$amf_y),
       nbStates = nbStates,
       nbSteps = nbSteps,
-      nbObs = nbObs
+      nbObs = nbObs,
+      secondObs = secondObs
     )
     
     ## TMB - create objective function
@@ -211,7 +213,7 @@ sfilter <-
         data,
         parameters,
         map = map,
-        random = c("alpha"),
+        random = c("mu"),
         DLL = "crwHMM",
         hessian = TRUE,
         silent = !verbose,
@@ -249,27 +251,28 @@ sfilter <-
     ## if error then exit with limited output to aid debugging
     rep <- suppressWarnings(try(sdreport(obj)))
     if (!inherits(opt, "try-error") & !inherits(rep, "try-error")) {
-      
+     # return(list(rep=rep, obj=obj, opt=opt) )
       ## Parameters, states and the fitted values
       message("Estmating locations...")
       fxd <- summary(rep, "report")
       tmp <- summary(rep, "random")
-      alpha_idx <- rep(c(1:4), nrow(d.all))
-      loc <- cbind(tmp[alpha_idx == 1,1], tmp[alpha_idx == 3,1],
-                   tmp[alpha_idx == 1,2],tmp[alpha_idx == 3,2])
+      alpha_idx <- rep(c(1:2), nrow(d.all))
+      loc <- cbind(tmp[alpha_idx == 1,1], tmp[alpha_idx == 2,1],
+                   tmp[alpha_idx == 1,2],tmp[alpha_idx == 2,2])
       colnames(loc) <- c("x", "y", "x.se", "y.se")
       loc <- as_tibble(loc)
-      vel <- cbind(tmp[alpha_idx == 2,1], tmp[alpha_idx == 4,1],
-                   tmp[alpha_idx == 2,2],tmp[alpha_idx == 4,2])
-      colnames(vel) <- c("u", "v", "u.se", "v.se")
-      vel <- as_tibble(vel)
-      rdm <- bind_cols(loc, vel) %>%
+      # vel <- cbind(tmp[alpha_idx == 2,1], tmp[alpha_idx == 4,1],
+      #              tmp[alpha_idx == 2,2],tmp[alpha_idx == 4,2])
+      # colnames(vel) <- c("u", "v", "u.se", "v.se")
+      # vel <- as_tibble(vel)
+      rdm <- loc %>% #bind_cols(loc, vel) %>%
         mutate(
           id = unique(d.all$id),
           date = d.all$date,
           isd = d.all$isd
         ) %>%
-        select(id, date, x, y, x.se, y.se, u, v, u.se, v.se, isd)
+        # select(id, date, x, y, x.se, y.se, u, v, u.se, v.se, isd)
+        select(id, date, x, y, x.se, y.se, isd)
       ## Fitted values (estimated locations at observation times)
       fd <- rdm %>%
         filter(isd) %>%

@@ -1,4 +1,4 @@
-set.seed(8,kind = "Mersenne-Twister",normal.kind = "Inversion")
+set.seed(1,kind = "Mersenne-Twister",normal.kind = "Inversion")
 data(rope)
 rope2 <- as.data.frame(rope)
 newrope <- NULL
@@ -11,4 +11,4 @@ for(i in unique(rope2$id)){
 }
 
 fit1 <- fit_ssm(newrope, time.step = 24, nbStates=1)
-fit2 <- fit_ssm(newrope, time.step = 24, nbStates=2)
+fit2 <- fit_ssm(newrope, time.step = 24, verbose=2,nbStates=2)

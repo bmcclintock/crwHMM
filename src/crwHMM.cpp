@@ -248,51 +248,20 @@ matrix<Type> stProbs(matrix<Type> elnalpha, matrix<Type> elnbeta, int nbSteps) {
   return gamma;
 }
 
-// Function for creating cov mat for ctcrw SSM
-template<class Type>
-matrix<Type> make_Q(Type beta, Type sigma2, Type dt){
-  matrix<Type> Q(4,4);
-  Q.setZero();
-  Type expBetaDT = exp(-beta*dt);
-  Q(0,0) = sigma2 * (dt -(Type(2.0)/beta)*(Type(1.0)-expBetaDT) + (Type(1.0)/(Type(2.0)*beta))*(Type(1.0)-expBetaDT * expBetaDT));
-  Q(1,1) = sigma2 * beta*(Type(1.0)-expBetaDT * expBetaDT)/Type(2.0);
-  Q(0,1) = sigma2 * (Type(1.0) - Type(2.0)*expBetaDT + expBetaDT * expBetaDT)/Type(2.0);
-  Q(1,0) = Q(0,1);
-  Q(2,2) = Q(0,0);
-  Q(3,3) = Q(1,1);
-  Q(2,3) = Q(0,1);
-  Q(3,2) = Q(0,1);
-  return Q;
-}
-
-// Function for creating projection matrix for ctcrw SSM
-template<class Type>
-matrix<Type> make_T(Type beta, Type dt){
-  matrix<Type> T(4,4);
-  T.setZero();
-  Type expBetaDT = exp(-beta*dt);
-  T(0,0) = Type(1.0); 
-  T(0,1) = (Type(1.0)-expBetaDT)/beta;
-  T(1,1) = expBetaDT;
-  T(2,2) = Type(1.0);
-  T(2,3) = T(0,1);
-  T(3,3) = T(1,1);
-  return T;
-}
-
 template<class Type>
   Type objective_function<Type>::operator() ()
   {
     // DATA
     DATA_MATRIX(Y);	            //  (x, y) observations
     DATA_VECTOR(dt);         	//  time diff in some appropriate unit. this should contain dt for both interp and obs positions.
-    DATA_VECTOR(alpha0);        //  initial state mean
-    DATA_SCALAR(Vmu0);          // Prior variance of first location
+    DATA_VECTOR(mu0);        //  initial state mean
+    DATA_SCALAR(V0);          // Prior variance of first location
     DATA_IVECTOR(isd);          //  indexes observations vs. interpolation points
     DATA_IVECTOR(obs_mod);      //  indicates which obs error model to be used
     DATA_INTEGER(nbStates);  // number of states
     DATA_INTEGER(nbSteps);  // number of predicted intervals 
     DATA_IVECTOR(nbObs);  // number of observations and predicted locations per time step
+    DATA_INTEGER(secondObs); // time step for the 2nd observation
     
     // for KF observation model
     DATA_VECTOR(m);             //  m is the semi-minor axis length
@@ -306,7 +275,7 @@ template<class Type>
     PARAMETER_VECTOR(log_beta);				
     PARAMETER_VECTOR(log_sigma);
     // random variables
-    PARAMETER_MATRIX(alpha); /* State matrix */
+    PARAMETER_MATRIX(mu); /* State matrix */
   
     // OBSERVATION PARAMETERS
     // for KF OBS MODEL
@@ -322,23 +291,25 @@ template<class Type>
     // Transform parameters
     vector<Type> beta(nbStates);
     vector<Type> sigma2(nbStates);
+    vector<Type> sigma(nbStates);
     for(int i=0; i < nbStates; i++){
       beta(i) = exp(log_beta(i));
       sigma2(i) = exp(2*log_sigma(i));
+      sigma(i) = sqrt(sigma2(i));
     }
     Type psi = exp(l_psi);
     vector<Type> tau = exp(l_tau);
     Type rho_o = Type(2.0) / (Type(1.0) + exp(-l_rho_o)) - Type(1.0);
-
-	  vector<Type> delta(nbStates);
-	  matrix<Type> trMat(nbStates,nbStates);
-	  delta(0) = Type(1.0);
+  
+    vector<Type> delta(nbStates);
+    matrix<Type> trMat(nbStates,nbStates);
+    delta(0) = Type(1.0);
     for(int i=1; i < nbStates; i++){
       delta(i) = exp(l_delta(i-1));
     }
-	  delta /= delta.sum();
-	  int cpt = 0;
-	  for(int i=0;i<nbStates;i++){
+    delta /= delta.sum();
+    int cpt = 0;
+    for(int i=0;i<nbStates;i++){
       for(int j=0;j<nbStates;j++){
         if(i==j) {
           trMat(i,j) = Type(1.0);
@@ -346,61 +317,61 @@ template<class Type>
         } else trMat(i,j) = exp(l_gamma(0,i*nbStates+j-cpt));
       }
       trMat.row(i) /= trMat.row(i).sum();
-	  }
-
+    }
+  
     int timeSteps = dt.size();
-
+    
+    /* Define likelihood */
+    //parallel_accumulator<Type> jnll(this);
+    matrix<Type> mu_bar_i(2,nbStates);
+    vector<Type> sig_i(nbStates);
+    Type nll_obs=0.0;
+    
     /* Define likelihood */
     parallel_accumulator<Type> nll(this);
     //Type nll=0.0;
     
-    // Setup object for evaluating multivariate normal likelihood
-    matrix<Type> Q(4,4);
-    matrix<Type> T(4,4);
-    matrix<Type> mu(2,timeSteps);
-    matrix<Type> cov_obs(2, 2);
-    cov_obs.setZero();
-
     matrix<Type> allProbs(nbSteps,nbStates);
     allProbs.setZero();
-    vector<Type> x;
     vector<Type> delta0(nbStates);
     
-    
+    // CRW
   	// crwHMM PROCESS MODEL
     	
     for(int state = 0; state < nbStates; state++){
-      
-      // acount for initial distribution and initial state of CTCRW
-      Q.setZero();
-      Q(0,0) = Vmu0;
-      Q(1,1) = sigma2(state)*beta(state)/2;
-      Q(2,2) = Vmu0;
-      Q(3,3) = Q(1,1);
 
-      x = alpha.col(0)-alpha0.matrix();
-      delta0(state) = eexp(elnproduct(eln(delta(state)),-MVNORM(Q)(x)));
+      //initial locs
+      // time 0
+      //delta0(state) = eexp(elnproduct(eln(delta(state)),dnorm(mu(0,0), mu0(0), V0,  1) + dnorm(mu(1,0), mu0(1), V0,  1)));
+      delta0(state) = delta(state);
       
-    	int count = 0;
+      //time 0 
+      allProbs(0,state) += dnorm(mu(0,0), mu0(0), V0,  1) + dnorm(mu(1,0), mu0(1), V0,  1);
+        
+      //time 1
+      sig_i(state) = dt(1)*sigma(state)/(Type(2.0)*beta(state));
+      allProbs(secondObs,state) +=  dnorm(mu(0,1), mu(0,0), sig_i(state),  1) + dnorm(mu(1,1), mu(1,0), sig_i(state),  1); 
+      
+      int count = 1;
   	  for(int t=0; t < nbSteps; t++){
         for(int i = 0; i < nbObs[t]; i++) {
           count++;
-          Q = make_Q(beta(state), sigma2(state), dt(count));
-          T = make_T(beta(state), dt(count));
-          x = alpha.col(count) - T * alpha.col(count-1);
-          allProbs(t,state) -= MVNORM(Q)(x);
+          mu_bar_i.col(state) = (Type(1.0)+dt(count)/dt(count-1)-beta(state)*dt(count))*mu.col(count-1) + 
+              (beta(state)*dt(count)-dt(count)/dt(count-1))*mu.col(count-2);
+          sig_i(state) = dt(count)*sqrt(dt(count-1))*sigma(state);
+          allProbs(t,state) += dnorm(mu(0,count), mu_bar_i(0,state), sig_i(state), 1) + 
+            dnorm(mu(1,count), mu_bar_i(1,state), sig_i(state), 1);
         }
-  	  }
+      }
     }
 
     REPORT(allProbs);
 
     // OBSERVATION MODEL
     // 2 x 2 covariance matrix for observations
-    
+    matrix<Type> cov_obs(2, 2);
+    cov_obs.setZero();
     for(int i = 0; i < timeSteps; ++i) {
-      mu(0,i) = alpha(0,i);
-      mu(1,i) = alpha(2,i);
       if(isd(i) == 1) {
         if(obs_mod(i) == 0) {
           // Argos Least Squares observations
@@ -422,17 +393,16 @@ template<class Type>
           cov_obs(0,1) = (0.5 * (M(i) * M(i) - (m(i) * psi * m(i) * psi))) * cos(c(i)) * sin(c(i));
           cov_obs(1,0) = cov_obs(0,1);
         }
-        nll +=  MVNORM(cov_obs)(Y.col(i) - mu.col(i));   // CRW innovations
+        nll_obs +=  MVNORM(cov_obs)(Y.col(i) - mu.col(i));   // CRW innovations
       }
     }
-    
       // forward algorithm
     Type hmmll = forward_alg(delta0, trMat, allProbs, nbSteps);
     REPORT(hmmll);
-    nll += hmmll;
+    nll += hmmll + nll_obs;
 
     ADREPORT(beta);
-    ADREPORT(sigma2);
+    ADREPORT(sigma);
     ADREPORT(rho_o);
     ADREPORT(tau);
     ADREPORT(psi);
@@ -449,7 +419,9 @@ template<class Type>
       ADREPORT(delta);
       ADREPORT(trMat);
     }
+    REPORT(nll_obs);
     
     return nll;
+
 }
 
