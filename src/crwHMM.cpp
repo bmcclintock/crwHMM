@@ -19,9 +19,7 @@ Type objective_function<Type>::operator() ()
   DATA_VECTOR(mu0);        //  initial state mean
   DATA_SCALAR(V0);          // Prior variance of first location
   DATA_IVECTOR(isd);          //  indexes observations vs. interpolation points
-  DATA_IVECTOR(obs_mod); //  indicates which obs error model to be used
-  
-  DATA_INTEGER(nbStates);
+  DATA_IVECTOR(obs_mod);      //  indicates which obs error model to be used
   
   // for KF observation model
   DATA_VECTOR(m);             //  m is the semi-minor axis length
@@ -32,8 +30,8 @@ Type objective_function<Type>::operator() ()
   
   // PROCESS PARAMETERS
   // for CRW
-  PARAMETER_VECTOR(log_beta);				
-  PARAMETER_VECTOR(log_sigma);
+  PARAMETER(log_beta);				
+  PARAMETER(log_sigma);
   // random variables
   PARAMETER_MATRIX(mu); /* State matrix */
   
@@ -45,8 +43,8 @@ Type objective_function<Type>::operator() ()
   PARAMETER(l_rho_o);             // error correlation
   
   // Transform parameters
-  vector<Type> beta = exp(log_beta);
-  vector<Type> sigma = exp(log_sigma);
+  Type beta = exp(log_beta);
+  Type sigma = exp(log_sigma);
   Type psi = exp(l_psi);
   vector<Type> tau = exp(l_tau);
   Type rho_o = Type(2.0) / (Type(1.0) + exp(-l_rho_o)) - Type(1.0);
@@ -55,8 +53,8 @@ Type objective_function<Type>::operator() ()
   
   /* Define likelihood */
   //parallel_accumulator<Type> jnll(this);
-  matrix<Type> mu_bar_i(2,nbStates);
-  vector<Type> sig_i;
+  vector<Type> mu_bar_i(2);
+  Type sig_i;
   Type nll_proc=0.0;
   Type nll_obs=0.0;
   Type nll=0.0;
@@ -72,18 +70,14 @@ Type objective_function<Type>::operator() ()
   nll_proc -= dnorm(mu(0,0), mu0(0), V0,  1) + 
     dnorm(mu(1,0), mu0(1), V0,  1); 
   //time 1
-  for(int j=0; j<nbStates; j++) {
-    sig_i = dt(1)*sigma/(2*beta);
-  }
+  sig_i = dt(1)*sigma/(2*beta);
   nll_proc -= dnorm(mu(0,1), mu(0,0), sig_i,  1) + 
     dnorm(mu(1,1), mu(1,0), sig_i,  1); 
 
   for(int i = 2; i < timeSteps; i++) {
-    for(int j=0; j<nbStates; j++) {
-      mu_bar_i.col(j) = (1+dt(i)/dt(i-1)-beta(j)*dt(i))*mu.col(i-1) + 
-        (beta(j)*dt(i)-dt(i)/dt(i-1))*mu.col(i-2);
-      sig_i(j) = dt(i)*sqrt(dt(i-1))*sigma(j);
-    }
+    mu_bar_i = (1+dt(i)/dt(i-1)-beta*dt(i))*mu.col(i-1) + 
+      (beta*dt(i)-dt(i)/dt(i-1))*mu.col(i-2);
+    sig_i = dt(i)*sqrt(dt(i-1))*sigma;
     nll_proc -= dnorm(mu(0,i), mu_bar_i(0), sig_i, 1) + 
       dnorm(mu(1,i), mu_bar_i(1), sig_i, 1);
   }
