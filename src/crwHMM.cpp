@@ -1,4 +1,4 @@
-
+#define TMB_LIB_INIT R_init_crwHMM
 #include <TMB.hpp>
 #include <cmath>
 
