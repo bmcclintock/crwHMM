@@ -157,15 +157,15 @@ vector<int> viterbi(vector<Type> delta, matrix<Type> trMat, matrix<Type> lnProbs
       ldeltaG(j) = elnsum(ldeltaG(j),elnproduct(eln(delta(i)),ltrMat(i,j)));
     }
     psi(0,j) = 0;
-    phi(0,j) = elnsum(ldeltaG(j),lnProbs(0,j));
+    phi(0,j) = elnproduct(ldeltaG(j),lnProbs(0,j));
   }
   for(int t=1; t < nbSteps; t++){
     for(int j=0; j < nbStates; j++){
       for(int i=0; i < nbStates; i++){
-        tmpphi(i) = phi(t-1,i) + ltrMat(i,j);
+        tmpphi(i) = elnproduct(phi(t-1,i),ltrMat(i,j));
       }
       psi(t,j) = which_max(tmpphi);
-      phi(t,j) = tmpphi(psi(t,j)) + lnProbs(t,j);
+      phi(t,j) = elnproduct(tmpphi(psi(t,j)),lnProbs(t,j));
     }
   }
   states(nbSteps-1) += which_max(vector<Type>(phi.row(nbSteps-1)));
