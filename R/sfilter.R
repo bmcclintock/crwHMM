@@ -300,12 +300,12 @@ sfilter <-
         aic = aic,
         time = proc.time() - st,
         
-        report = obj$report()
+        report = obj$report(obj$par)
       )
       
       if(nbStates>1) {
-        out$states <- obj$report()$states
-        out$stateProbs <- obj$report()$stateProbs
+        out$states <- obj$report(obj$par)$states
+        out$stateProbs <- obj$report(obj$par)$stateProbs
       }
       
     } else {
